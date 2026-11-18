@@ -4,8 +4,9 @@ use crate::security::{is_allowed_navigation, parse_safe_ipc_message, SafeIpcMess
 use crate::{PlayerConfig, PlayerError, PlayerMode};
 use std::sync::Arc;
 use tao::dpi::LogicalSize;
-use tao::event::{Event, WindowEvent};
+use tao::event::{ElementState, Event, KeyEvent, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
+use tao::keyboard::KeyCode;
 use tao::window::{Fullscreen, WindowBuilder};
 use wry::{NewWindowResponse, PermissionResponse, WebViewBuilder};
 
@@ -80,6 +81,46 @@ pub fn run_player(config: PlayerConfig) -> Result<(), PlayerError> {
                 ..
             } if window_id == main_window_id => {
                 *control_flow = ControlFlow::Exit;
+            }
+            Event::WindowEvent {
+                window_id,
+                event:
+                    WindowEvent::KeyboardInput {
+                        event:
+                            KeyEvent {
+                                physical_key: KeyCode::F11,
+                                state: ElementState::Pressed,
+                                repeat: false,
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } if window_id == main_window_id => {
+                is_fullscreen = !is_fullscreen;
+                if is_fullscreen {
+                    window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+                } else {
+                    window.set_fullscreen(None);
+                }
+            }
+            Event::WindowEvent {
+                window_id,
+                event:
+                    WindowEvent::KeyboardInput {
+                        event:
+                            KeyEvent {
+                                physical_key: KeyCode::Escape,
+                                state: ElementState::Pressed,
+                                repeat: false,
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } if window_id == main_window_id && is_fullscreen => {
+                is_fullscreen = false;
+                window.set_fullscreen(None);
             }
             Event::UserEvent(SafeIpcMessage::ToggleFullscreen) => {
                 is_fullscreen = !is_fullscreen;
