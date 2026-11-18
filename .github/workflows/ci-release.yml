@@ -1,0 +1,365 @@
+name: CI & Release Packaging (.dmg, .deb, .msi)
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test-linux:
+    name: Test & Lint (Ubuntu)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: core
+
+      - name: Ensure templates/default exists for include_dir!
+        run: |
+          if [ ! -d "templates/default" ]; then
+            mkdir -p templates/default/src/slides templates/default/src/styles
+            echo '{"title":"Foil Presentation","aspectRatio":"16:9","width":1920,"height":1080,"theme":"default","slides":[]}' > templates/default/manifest.json
+            echo '{"name":"foil-deck","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite","build":"vite build"}}' > templates/default/package.json
+            echo 'import { defineConfig } from "vite"; export default defineConfig({ base: "./" });' > templates/default/vite.config.ts
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Foil</title></head><body><div id="foil-root"></div></body></html>' > templates/default/index.html
+            echo ':root { --foil-bg: #0b0f19; }' > templates/default/src/styles/theme.css
+            echo 'export default { html: "<section class=\"slide\"><h1>Foil</h1></section>" };' > templates/default/src/slides/01-capa.js
+            echo 'export default { html: "<section class=\"slide\"><h2>Demo</h2></section>" };' > templates/default/src/slides/02-demo.js
+          fi
+
+      - name: Install Linux WebKitGTK & GTK3 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            pkg-config \
+            build-essential
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Run cargo clippy
+        working-directory: core
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run cargo test
+        working-directory: core
+        run: cargo test --workspace
+
+  test-macos:
+    name: Test & Lint (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: core
+
+      - name: Ensure templates/default exists for include_dir!
+        run: |
+          if [ ! -d "templates/default" ]; then
+            mkdir -p templates/default/src/slides templates/default/src/styles
+            echo '{"title":"Foil Presentation","aspectRatio":"16:9","width":1920,"height":1080,"theme":"default","slides":[]}' > templates/default/manifest.json
+            echo '{"name":"foil-deck","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite","build":"vite build"}}' > templates/default/package.json
+            echo 'import { defineConfig } from "vite"; export default defineConfig({ base: "./" });' > templates/default/vite.config.ts
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Foil</title></head><body><div id="foil-root"></div></body></html>' > templates/default/index.html
+            echo ':root { --foil-bg: #0b0f19; }' > templates/default/src/styles/theme.css
+            echo 'export default { html: "<section class=\"slide\"><h1>Foil</h1></section>" };' > templates/default/src/slides/01-capa.js
+            echo 'export default { html: "<section class=\"slide\"><h2>Demo</h2></section>" };' > templates/default/src/slides/02-demo.js
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Run cargo clippy & test
+        working-directory: core
+        run: |
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace
+
+  test-windows:
+    name: Test & Lint (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: core
+
+      - name: Ensure templates/default exists for include_dir!
+        shell: bash
+        run: |
+          if [ ! -d "templates/default" ]; then
+            mkdir -p templates/default/src/slides templates/default/src/styles
+            echo '{"title":"Foil Presentation","aspectRatio":"16:9","width":1920,"height":1080,"theme":"default","slides":[]}' > templates/default/manifest.json
+            echo '{"name":"foil-deck","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite","build":"vite build"}}' > templates/default/package.json
+            echo 'import { defineConfig } from "vite"; export default defineConfig({ base: "./" });' > templates/default/vite.config.ts
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Foil</title></head><body><div id="foil-root"></div></body></html>' > templates/default/index.html
+            echo ':root { --foil-bg: #0b0f19; }' > templates/default/src/styles/theme.css
+            echo 'export default { html: "<section class=\"slide\"><h1>Foil</h1></section>" };' > templates/default/src/slides/01-capa.js
+            echo 'export default { html: "<section class=\"slide\"><h2>Demo</h2></section>" };' > templates/default/src/slides/02-demo.js
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Run cargo clippy & test
+        working-directory: core
+        run: |
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace
+
+  package-deb:
+    name: Package Linux (.deb)
+    needs: [test-linux]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: core
+
+      - name: Ensure templates/default exists
+        run: |
+          mkdir -p templates/default/src/slides templates/default/src/styles
+          echo '{"title":"Foil Presentation","aspectRatio":"16:9","width":1920,"height":1080,"theme":"default","slides":[]}' > templates/default/manifest.json
+          echo '{"name":"foil-deck","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite","build":"vite build"}}' > templates/default/package.json
+          echo 'import { defineConfig } from "vite"; export default defineConfig({ base: "./" });' > templates/default/vite.config.ts
+          echo '<!doctype html><html><head><meta charset="utf-8"><title>Foil</title></head><body><div id="foil-root"></div></body></html>' > templates/default/index.html
+          echo ':root { --foil-bg: #0b0f19; }' > templates/default/src/styles/theme.css
+          echo 'export default { html: "<section class=\"slide\"><h1>Foil</h1></section>" };' > templates/default/src/slides/01-capa.js
+          echo 'export default { html: "<section class=\"slide\"><h2>Demo</h2></section>" };' > templates/default/src/slides/02-demo.js
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            dpkg-dev \
+            pkg-config \
+            build-essential
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+
+      - name: Build Release & Generate .deb
+        working-directory: core
+        run: |
+          cargo build --release -p foil-cli
+          cargo deb -p foil-cli --no-build
+
+      - name: Upload .deb Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: foil-linux-amd64-deb
+          path: core/target/debian/*.deb
+
+  package-dmg:
+    name: Package macOS (.dmg)
+    needs: [test-macos]
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: core
+
+      - name: Ensure templates/default exists
+        run: |
+          mkdir -p templates/default/src/slides templates/default/src/styles
+          echo '{"title":"Foil Presentation","aspectRatio":"16:9","width":1920,"height":1080,"theme":"default","slides":[]}' > templates/default/manifest.json
+          echo '{"name":"foil-deck","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite","build":"vite build"}}' > templates/default/package.json
+          echo 'import { defineConfig } from "vite"; export default defineConfig({ base: "./" });' > templates/default/vite.config.ts
+          echo '<!doctype html><html><head><meta charset="utf-8"><title>Foil</title></head><body><div id="foil-root"></div></body></html>' > templates/default/index.html
+          echo ':root { --foil-bg: #0b0f19; }' > templates/default/src/styles/theme.css
+          echo 'export default { html: "<section class=\"slide\"><h1>Foil</h1></section>" };' > templates/default/src/slides/01-capa.js
+          echo 'export default { html: "<section class=\"slide\"><h2>Demo</h2></section>" };' > templates/default/src/slides/02-demo.js
+
+      - name: Install Rust toolchain (Apple Silicon + Intel targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Build Universal macOS Binary & Create Foil.app + .dmg
+        working-directory: core
+        run: |
+          cargo build --release -p foil-cli --target aarch64-apple-darwin
+          cargo build --release -p foil-cli --target x86_64-apple-darwin
+          mkdir -p target/universal/
+          lipo -create -output target/universal/foil \
+            target/aarch64-apple-darwin/release/foil \
+            target/x86_64-apple-darwin/release/foil
+          chmod +x target/universal/foil
+
+          APP_DIR="target/dmg/Foil.app/Contents"
+          mkdir -p "$APP_DIR/MacOS" "$APP_DIR/Resources"
+          cp target/universal/foil "$APP_DIR/MacOS/foil"
+
+          cat << 'PLIST' > "$APP_DIR/Info.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>foil</string>
+            <key>CFBundleIdentifier</key>
+            <string>dev.foil.player</string>
+            <key>CFBundleName</key>
+            <string>Foil</string>
+            <key>CFBundleDisplayName</key>
+            <string>Foil Player</string>
+            <key>CFBundleVersion</key>
+            <string>0.1.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>0.1.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>CFBundleDocumentTypes</key>
+            <array>
+              <dict>
+                <key>CFBundleTypeName</key>
+                <string>Foil Presentation</string>
+                <key>CFBundleTypeRole</key>
+                <string>Viewer</string>
+                <key>CFBundleTypeExtensions</key>
+                <array>
+                  <string>foil</string>
+                </array>
+              </dict>
+            </array>
+          </dict>
+          </plist>
+          PLIST
+
+          ln -s /Applications target/dmg/Applications
+          mkdir -p target/macos-dmg
+          hdiutil create \
+            -volname "Foil Engine" \
+            -srcfolder target/dmg \
+            -ov \
+            -format UDZO \
+            target/macos-dmg/foil-macos-universal.dmg
+
+      - name: Upload .dmg Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: foil-macos-universal-dmg
+          path: core/target/macos-dmg/*.dmg
+
+  package-msi:
+    name: Package Windows (.msi)
+    needs: [test-windows]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: core
+
+      - name: Ensure templates/default exists
+        shell: bash
+        run: |
+          mkdir -p templates/default/src/slides templates/default/src/styles
+          echo '{"title":"Foil Presentation","aspectRatio":"16:9","width":1920,"height":1080,"theme":"default","slides":[]}' > templates/default/manifest.json
+          echo '{"name":"foil-deck","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite","build":"vite build"}}' > templates/default/package.json
+          echo 'import { defineConfig } from "vite"; export default defineConfig({ base: "./" });' > templates/default/vite.config.ts
+          echo '<!doctype html><html><head><meta charset="utf-8"><title>Foil</title></head><body><div id="foil-root"></div></body></html>' > templates/default/index.html
+          echo ':root { --foil-bg: #0b0f19; }' > templates/default/src/styles/theme.css
+          echo 'export default { html: "<section class=\"slide\"><h1>Foil</h1></section>" };' > templates/default/src/slides/01-capa.js
+          echo 'export default { html: "<section class=\"slide\"><h2>Demo</h2></section>" };' > templates/default/src/slides/02-demo.js
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Install cargo-wix
+        run: cargo install cargo-wix --version 0.3.8 --locked
+
+      - name: Build Release & Generate .msi
+        working-directory: core
+        run: |
+          cargo build --release -p foil-cli
+          cargo wix -p foil-cli --nocapture --no-build
+
+      - name: Upload .msi Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: foil-windows-x64-msi
+          path: core/target/wix/*.msi
+
+  publish-github-release:
+    name: Publish GitHub Release Assets
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [package-deb, package-dmg, package-msi]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Upload .dmg, .deb and .msi to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/*.dmg
+            release-assets/*.deb
+            release-assets/*.msi

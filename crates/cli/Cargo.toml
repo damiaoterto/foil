@@ -3,10 +3,22 @@ name = "foil-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Foil AI-First Native Presentation Engine and Player"
 
 [[bin]]
 name = "foil"
 path = "src/main.rs"
+
+[package.metadata.deb]
+name = "foil"
+maintainer = "Damião Junior Terto <francisco.damiao.dev@gmail.com>"
+copyright = "2026, Damião Junior Terto"
+depends = "$auto, libwebkit2gtk-4.1-0, libgtk-3-0"
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/release/foil", "usr/bin/", "755"],
+]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }

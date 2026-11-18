@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product
+        Id="*"
+        Name="Foil Engine"
+        UpgradeCode="6F4C8E29-93A4-4B7E-A71F-82B412D7F091"
+        Manufacturer="Foil Project"
+        Language="1033"
+        Codepage="1252"
+        Version="$(var.Version)">
+
+        <Package
+            Id="*"
+            Keywords="Installer"
+            Description="Foil AI-First Presentation Engine Installer"
+            Manufacturer="Foil Project"
+            InstallerVersion="450"
+            Languages="1033"
+            Compressed="yes"
+            InstallScope="perMachine"
+            SummaryCodepage="1252" />
+
+        <MajorUpgrade
+            Schedule="afterInstallInitialize"
+            DowngradeErrorMessage="A newer version of [ProductName] is already installed. Setup will now exit." />
+
+        <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" DiskPrompt="CD-ROM #1" />
+        <Property Id="DiskPrompt" Value="Foil Engine Installation" />
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFiles64Folder" Name="PFiles">
+                <Directory Id="APPLICATIONFOLDER" Name="Foil">
+                    <Directory Id="Bin" Name="bin">
+                        <Component Id="Path" Guid="91A6B83C-5E42-4C91-9A2E-1B3C4D5E6F70" KeyPath="yes">
+                            <Environment
+                                Id="PATH"
+                                Name="PATH"
+                                Value="[Bin]"
+                                Permanent="no"
+                                Part="last"
+                                Action="set"
+                                System="yes" />
+                        </Component>
+                        <Component Id="Binary0" Guid="*">
+                            <File
+                                Id="exe0"
+                                Name="foil.exe"
+                                DiskId="1"
+                                Source="$(var.CargoTargetBinDir)\foil.exe"
+                                KeyPath="yes" />
+                            <ProgId Id="Foil.Presentation" Description="Foil Presentation Archive">
+                                <Extension Id="foil" ContentType="application/vnd.foil">
+                                    <Verb Id="open" Command="Open with Foil Player" TargetFile="exe0" Argument="open &quot;%1&quot;" />
+                                </Extension>
+                            </ProgId>
+                        </Component>
+                    </Directory>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Feature
+            Id="Binaries"
+            Title="Application"
+            Description="Installs all binaries and the PATH environment variable."
+            Level="1"
+            ConfigurableDirectory="APPLICATIONFOLDER"
+            AllowAdvertise="no"
+            Display="expand"
+            Absent="disallow">
+            <ComponentRef Id="Binary0" />
+            <ComponentRef Id="Path" />
+        </Feature>
+    </Product>
+</Wix>
