@@ -2,7 +2,7 @@ name: CI & Release Packaging (.dmg, .deb, .msi, linux-bin)
 
 on:
   release:
-    types: [published, created]
+    types: [published]
   push:
     tags: ["v*"]
   workflow_dispatch:
