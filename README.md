@@ -108,8 +108,20 @@ The compiled binary will be located at `target/release/foil`.
 
 ## Packaging & Releases (`.dmg`, `.deb`, `.msi`)
 
-The GitHub Actions workflow [`.github/workflows/ci-release.yml`](./.github/workflows/ci-release.yml) runs the full test suite across Linux, macOS, and Windows and automatically builds and attaches native installers whenever a GitHub **Release** is created (or a `v*` tag is pushed):
+The GitHub Actions workflow [`.github/workflows/ci-release.yml`](./.github/workflows/ci-release.yml) caches APT packages, Cargo registries/targets (`Swatinem/rust-cache@v2`), and packaging tools (`cargo-deb`, `cargo-wix`), runs the full test suite across Linux, macOS, and Windows, and automatically builds and attaches native installers whenever a GitHub **Release** is created (or a `v*` tag is pushed):
 
-* **macOS (`.dmg`):** Universal Binary (`aarch64-apple-darwin` + `x86_64-apple-darwin`) bundled inside `Foil.app` with `.foil` file association.
-* **Linux (`.deb`):** Built via `cargo-deb` with `libwebkit2gtk-4.1-0` and `libgtk-3-0` runtime dependencies.
+* **macOS (`.dmg` & `Foil.app`):** Universal Binary (`aarch64-apple-darwin` + `x86_64-apple-darwin`) bundled inside `Foil.app` with `.foil` file association.
+* **Linux (`.deb` & Standalone Binary):** Built via `cargo-deb` (`libwebkit2gtk-4.1-0`, `libgtk-3-0`) alongside a stripped standalone binary (`foil-linux-x86_64` and `foil-linux-x86_64.tar.gz`).
 * **Windows (`.msi`):** Built via `cargo-wix` ([`crates/cli/wix/main.wxs`](./crates/cli/wix/main.wxs)) with system `PATH` registration and `.foil` file association.
+
+### Quick Install Script (`install.sh` — macOS `Foil.app` & Linux Binary)
+
+You can install either from a local build (`target/release/foil`) or directly from GitHub Releases using [`install.sh`](./install.sh):
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+* **On macOS:** Mounts the `.dmg` (or bundles the local `target/release/foil` binary), installs `Foil.app` into `/Applications/Foil.app`, clears quarantine attributes, and symlinks `/usr/local/bin/foil`.
+* **On Linux:** Installs the standalone `foil-linux-x86_64` (or local `target/release/foil`) binary directly to `/usr/local/bin/foil`.

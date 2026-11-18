@@ -1,4 +1,4 @@
-name: CI & Release Packaging (.dmg, .deb, .msi)
+name: CI & Release Packaging (.dmg, .deb, .msi, linux-bin)
 
 on:
   release:
@@ -15,6 +15,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
 jobs:
   test-linux:
@@ -39,10 +40,18 @@ jobs:
             echo 'export default { html: "<section class=\"slide\"><h2>Demo</h2></section>" };' > templates/default/src/slides/02-demo.js
           fi
 
+      - name: Cache APT packages (.deb)
+        id: apt-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/apt-cache
+          key: apt-webkit2gtk-ubuntu24.04-v1
+
       - name: Install Linux WebKitGTK & GTK3 dependencies
         run: |
+          mkdir -p /tmp/apt-cache
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y -o Dir::Cache::Archives="/tmp/apt-cache" \
             libwebkit2gtk-4.1-dev \
             libgtk-3-dev \
             libayatana-appindicator3-dev \
@@ -56,10 +65,12 @@ jobs:
         with:
           components: clippy, rustfmt
 
-      - name: Rust Cache
+      - name: Cache Cargo Registry, Git & Target Build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
+          cache-on-failure: true
+          shared-key: "linux-cargo"
 
       - name: Run cargo clippy
         working-directory: core
@@ -96,10 +107,12 @@ jobs:
         with:
           components: clippy
 
-      - name: Rust Cache
+      - name: Cache Cargo Registry, Git & Target Build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
+          cache-on-failure: true
+          shared-key: "macos-cargo"
 
       - name: Run cargo clippy & test
         working-directory: core
@@ -135,10 +148,12 @@ jobs:
         with:
           components: clippy
 
-      - name: Rust Cache
+      - name: Cache Cargo Registry, Git & Target Build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
+          cache-on-failure: true
+          shared-key: "windows-cargo"
 
       - name: Run cargo clippy & test
         working-directory: core
@@ -146,8 +161,8 @@ jobs:
           cargo clippy --workspace --all-targets -- -D warnings
           cargo test --workspace
 
-  package-deb:
-    name: Package Linux (.deb)
+  package-linux:
+    name: Package Linux (.deb & standalone binary)
     needs: [test-linux]
     runs-on: ubuntu-24.04
     steps:
@@ -167,10 +182,17 @@ jobs:
           echo 'export default { html: "<section class=\"slide\"><h1>Foil</h1></section>" };' > templates/default/src/slides/01-capa.js
           echo 'export default { html: "<section class=\"slide\"><h2>Demo</h2></section>" };' > templates/default/src/slides/02-demo.js
 
+      - name: Cache APT packages (.deb)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/apt-cache
+          key: apt-webkit2gtk-ubuntu24.04-v1
+
       - name: Install Linux dependencies
         run: |
+          mkdir -p /tmp/apt-cache
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y -o Dir::Cache::Archives="/tmp/apt-cache" \
             libwebkit2gtk-4.1-dev \
             libgtk-3-dev \
             libayatana-appindicator3-dev \
@@ -182,28 +204,46 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust Cache
+      - name: Cache Cargo Registry, Git & Target Build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
+          cache-on-failure: true
+          shared-key: "linux-release-cargo"
+
+      - name: Cache cargo-deb binary
+        id: cache-cargo-deb
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-deb
+          key: cargo-deb-2.10-${{ runner.os }}
 
       - name: Install cargo-deb
+        if: steps.cache-cargo-deb.outputs.cache-hit != 'true'
         run: cargo install cargo-deb --locked
 
-      - name: Build Release & Generate .deb
+      - name: Build Release Binary, Strip, Tarball & Generate .deb
         working-directory: core
         run: |
           cargo build --release -p foil-cli
+          strip target/release/foil
+          mkdir -p target/linux-bin
+          cp target/release/foil target/linux-bin/foil-linux-x86_64
+          chmod +x target/linux-bin/foil-linux-x86_64
+          tar -C target/release -czf target/linux-bin/foil-linux-x86_64.tar.gz foil
           cargo deb -p foil-cli --no-build
 
-      - name: Upload .deb Artifact
+      - name: Upload Linux .deb & Standalone Binary Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: foil-linux-amd64-deb
-          path: core/target/debian/*.deb
+          name: foil-linux-amd64-packages
+          path: |
+            core/target/debian/*.deb
+            core/target/linux-bin/foil-linux-x86_64
+            core/target/linux-bin/foil-linux-x86_64.tar.gz
 
   package-dmg:
-    name: Package macOS (.dmg)
+    name: Package macOS (.dmg & Foil.app)
     needs: [test-macos]
     runs-on: macos-latest
     steps:
@@ -228,10 +268,12 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-      - name: Rust Cache
+      - name: Cache Cargo Registry, Git & Target Build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
+          cache-on-failure: true
+          shared-key: "macos-release-cargo"
 
       - name: Build Universal macOS Binary & Create Foil.app + .dmg
         working-directory: core
@@ -326,12 +368,22 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust Cache
+      - name: Cache Cargo Registry, Git & Target Build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
+          cache-on-failure: true
+          shared-key: "windows-release-cargo"
+
+      - name: Cache cargo-wix binary
+        id: cache-cargo-wix
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-wix.exe
+          key: cargo-wix-0.3.8-${{ runner.os }}
 
       - name: Install cargo-wix
+        if: steps.cache-cargo-wix.outputs.cache-hit != 'true'
         run: cargo install cargo-wix --version 0.3.8 --locked
 
       - name: Build Release & Generate .msi
@@ -349,7 +401,7 @@ jobs:
   publish-github-release:
     name: Publish GitHub Release Assets
     if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
-    needs: [package-deb, package-dmg, package-msi]
+    needs: [package-linux, package-dmg, package-msi]
     runs-on: ubuntu-latest
     steps:
       - name: Download all installer artifacts
@@ -358,7 +410,7 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Upload .dmg, .deb and .msi to GitHub Release
+      - name: Upload .dmg, .deb, .msi and standalone Linux binary to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name || github.ref_name }}
@@ -366,3 +418,5 @@ jobs:
             release-assets/*.dmg
             release-assets/*.deb
             release-assets/*.msi
+            release-assets/foil-linux-x86_64
+            release-assets/foil-linux-x86_64.tar.gz
