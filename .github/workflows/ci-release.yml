@@ -4,10 +4,7 @@ on:
   release:
     types: [published, created]
   push:
-    branches: [main]
     tags: ["v*"]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
