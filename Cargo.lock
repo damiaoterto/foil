@@ -674,6 +674,7 @@ name = "foil-player"
 version = "0.1.0"
 dependencies = [
  "foil-packager",
+ "image",
  "serde",
  "serde_json",
  "tao",

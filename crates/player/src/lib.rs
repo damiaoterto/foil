@@ -11,7 +11,7 @@ pub use protocol::handle_foil_protocol_request;
 pub use security::{
     is_allowed_navigation, parse_safe_ipc_message, SafeIpcMessage, FOIL_ORIGIN_PREFIX,
 };
-pub use window::run_player;
+pub use window::{load_embedded_window_icon, run_player};
 
 use foil_packager::{FoilArchiveReader, PackagerError};
 use thiserror::Error;
@@ -162,5 +162,10 @@ mod tests {
         assert_eq!(resp.diagnostics.slide_index, 3);
         assert_eq!(resp.diagnostics.step_index, 1);
         assert!(resp.screenshot_base64.is_some());
+    }
+
+    #[test]
+    fn test_embedded_window_icon_loads_valid_rgba() {
+        assert!(load_embedded_window_icon().is_some());
     }
 }

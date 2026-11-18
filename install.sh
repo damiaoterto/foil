@@ -66,6 +66,9 @@ install_macos_local_binary() {
   run_with_privilege "$FOIL_APP_DIR" mkdir -p "${app_contents}/MacOS" "${app_contents}/Resources"
   run_with_privilege "$FOIL_APP_DIR" cp "$bin_path" "${app_contents}/MacOS/foil"
   run_with_privilege "$FOIL_APP_DIR" chmod +x "${app_contents}/MacOS/foil"
+  if [ -f "assets/icons/foil-icon.icns" ]; then
+    run_with_privilege "$FOIL_APP_DIR" cp "assets/icons/foil-icon.icns" "${app_contents}/Resources/foil-icon.icns"
+  fi
 
   local tmp_plist
   tmp_plist="$(mktemp /tmp/foil-plist.XXXXXX)"
@@ -76,6 +79,8 @@ install_macos_local_binary() {
 <dict>
   <key>CFBundleExecutable</key>
   <string>foil</string>
+  <key>CFBundleIconFile</key>
+  <string>foil-icon.icns</string>
   <key>CFBundleIdentifier</key>
   <string>dev.foil.player</string>
   <key>CFBundleName</key>

@@ -7,8 +7,16 @@ use tao::dpi::LogicalSize;
 use tao::event::{ElementState, Event, KeyEvent, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tao::keyboard::KeyCode;
-use tao::window::{Fullscreen, WindowBuilder};
+use tao::window::{Fullscreen, Icon, WindowBuilder};
 use wry::{NewWindowResponse, PermissionResponse, WebViewBuilder};
+
+const EMBEDDED_WINDOW_ICON_PNG: &[u8] = include_bytes!("../../../assets/icons/foil-icon-64.png");
+
+pub fn load_embedded_window_icon() -> Option<Icon> {
+    let img = image::load_from_memory(EMBEDDED_WINDOW_ICON_PNG).ok()?.into_rgba8();
+    let (width, height) = img.dimensions();
+    Icon::from_rgba(img.into_raw(), width, height).ok()
+}
 
 pub fn run_player(config: PlayerConfig) -> Result<(), PlayerError> {
     let event_loop = EventLoopBuilder::<SafeIpcMessage>::with_user_event().build();
@@ -17,6 +25,7 @@ pub fn run_player(config: PlayerConfig) -> Result<(), PlayerError> {
     let mut window_builder = WindowBuilder::new()
         .with_title(&config.title)
         .with_inner_size(LogicalSize::new(1280.0, 720.0))
+        .with_window_icon(load_embedded_window_icon())
         .with_visible(!config.headless);
 
     if config.fullscreen {

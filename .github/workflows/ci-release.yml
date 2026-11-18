@@ -289,6 +289,7 @@ jobs:
           APP_DIR="target/dmg/Foil.app/Contents"
           mkdir -p "$APP_DIR/MacOS" "$APP_DIR/Resources"
           cp target/universal/foil "$APP_DIR/MacOS/foil"
+          cp assets/icons/foil-icon.icns "$APP_DIR/Resources/foil-icon.icns"
 
           cat << 'PLIST' > "$APP_DIR/Info.plist"
           <?xml version="1.0" encoding="UTF-8"?>
@@ -297,6 +298,8 @@ jobs:
           <dict>
             <key>CFBundleExecutable</key>
             <string>foil</string>
+            <key>CFBundleIconFile</key>
+            <string>foil-icon.icns</string>
             <key>CFBundleIdentifier</key>
             <string>dev.foil.player</string>
             <key>CFBundleName</key>
