@@ -1,0 +1,22 @@
+[package]
+name = "foil-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "foil"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+foil-mcp-server = { path = "../mcp-server" }
+foil-packager = { path = "../packager" }
+foil-player = { path = "../player" }
+include_dir = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+[dev-dependencies]
+tempfile = "3.14"
