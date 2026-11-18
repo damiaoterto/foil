@@ -1,6 +1,12 @@
-# Foil Core (`foil`)
+<p align="center">
+  <img src="./assets/icons/foil-icon-128.png" alt="Foil Logo" width="112" height="112" />
+</p>
 
-**Foil** is an **AI-First**, native-performance presentation engine built in **Rust** (`tao` + `wry`) that renders HTML, CSS, and Vanilla JS/WebGL presentations (`1920x1080` at 60/120fps) inside a hermetic, 100% offline sandbox.
+<h1 align="center">Foil Core (<code>foil</code>)</h1>
+
+<p align="center">
+  <strong>Foil</strong> is an <strong>AI-First</strong>, native-performance presentation engine built in <strong>Rust</strong> (<code>tao</code> + <code>wry</code>) that renders HTML, CSS, and Vanilla JS/WebGL presentations (<code>1920x1080</code> at 60/120fps) inside a hermetic, 100% offline sandbox.
+</p>
 
 ---
 
