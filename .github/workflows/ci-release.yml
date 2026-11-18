@@ -1,6 +1,8 @@
 name: CI & Release Packaging (.dmg, .deb, .msi)
 
 on:
+  release:
+    types: [published, created]
   push:
     branches: [main]
     tags: ["v*"]
@@ -346,7 +348,7 @@ jobs:
 
   publish-github-release:
     name: Publish GitHub Release Assets
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
     needs: [package-deb, package-dmg, package-msi]
     runs-on: ubuntu-latest
     steps:
@@ -359,6 +361,7 @@ jobs:
       - name: Upload .dmg, .deb and .msi to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: |
             release-assets/*.dmg
             release-assets/*.deb
