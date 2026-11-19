@@ -141,7 +141,7 @@ pub fn execute_cli(cli: FoilCli, cwd: &Path) -> Result<(), CliError> {
             let reader = FoilArchiveReader::from_path(&file)?;
             if browser {
                 println!(
-                    "Verified {} files in {}. Ready for @foil/web-player.",
+                    "Verified {} files in {}. Ready for @foil-engine/web-player.",
                     reader.file_count(),
                     file.display()
                 );

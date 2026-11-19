@@ -30,7 +30,7 @@ If someone tries to present using only a loose `index.html` in Chrome, they imme
 
 ### 4. Memory & GPU Limits with Rich Animations (Three.js / Motion)
 * **Plain HTML:** Putting multiple slides with Three.js scenes, Canvas, or heavy animations in a single DOM document keeps all WebGL contexts alive simultaneously — causing frame drops or hitting the browser's active WebGL context limit.
-* **With Foil:** `@foil/runtime` isolates each slide as an independent module with explicit mounting and teardown (`onLeave` running `dispose()`), maintaining a rock-solid 60/120fps.
+* **With Foil:** `@foil-engine/runtime` isolates each slide as an independent module with explicit mounting and teardown (`onLeave` running `dispose()`), maintaining a rock-solid 60/120fps.
 
 ### 5. Automated Build Optimization
 * **Plain HTML:** Either you depend on external links (CDNs that can fail right before you walk on stage), or you ship bloated images and unminified libraries without tree-shaking.

@@ -65,7 +65,7 @@ pub fn handle_rpc_request(workspace_dir: &Path, request: JsonRpcRequest) -> Json
             json!({
                 "protocolVersion": "2024-11-05",
                 "capabilities": { "tools": {} },
-                "serverInfo": { "name": "foil-mcp-server", "version": "0.1.0" }
+                "serverInfo": { "name": "foil-mcp-server", "version": env!("CARGO_PKG_VERSION") }
             }),
         ),
         "tools/list" => JsonRpcResponse::success(id, list_mcp_tools()),
@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn test_mcp_install_package_rejects_shell_injection_names() {
         assert!(validate_package_name("motion").is_ok());
-        assert!(validate_package_name("@foil/runtime").is_ok());
+        assert!(validate_package_name("@foil-engine/runtime").is_ok());
         assert!(validate_package_name("three; rm -rf /").is_err());
         assert!(validate_package_name("--evil-flag").is_err());
     }
