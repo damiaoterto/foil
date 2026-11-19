@@ -12,8 +12,8 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
-  test-linux:
-    name: Test & Lint (Ubuntu)
+  linux:
+    name: Test, Lint & Package (Ubuntu)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -35,22 +35,23 @@ jobs:
           fi
 
       - name: Cache APT packages (.deb)
-        id: apt-cache
         uses: actions/cache@v4
         with:
           path: /tmp/apt-cache
-          key: apt-webkit2gtk-ubuntu24.04-v1
+          key: apt-webkit2gtk-ubuntu24.04-v2
 
       - name: Install Linux WebKitGTK & GTK3 dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           mkdir -p /tmp/apt-cache
           sudo apt-get update
-          sudo apt-get install -y -o Dir::Cache::Archives="/tmp/apt-cache" \
+          sudo apt-get install -y --no-install-recommends \
+            -o Dir::Cache::Archives="/tmp/apt-cache" \
+            -o Dpkg::Options::="--force-unsafe-io" \
             libwebkit2gtk-4.1-dev \
             libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
+            dpkg-dev \
             pkg-config \
             build-essential
 
@@ -73,6 +74,37 @@ jobs:
       - name: Run cargo test
         working-directory: core
         run: cargo test --workspace
+
+      - name: Cache cargo-deb binary
+        id: cache-cargo-deb
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-deb
+          key: cargo-deb-2.10-${{ runner.os }}
+
+      - name: Install cargo-deb
+        if: steps.cache-cargo-deb.outputs.cache-hit != 'true'
+        run: cargo install cargo-deb --locked
+
+      - name: Build Release Binary, Strip, Tarball & Generate .deb
+        working-directory: core
+        run: |
+          cargo build --release -p foil-cli
+          strip target/release/foil
+          mkdir -p target/linux-bin
+          cp target/release/foil target/linux-bin/foil-linux-x86_64
+          chmod +x target/linux-bin/foil-linux-x86_64
+          tar -C target/release -czf target/linux-bin/foil-linux-x86_64.tar.gz foil
+          cargo deb -p foil-cli --no-build
+
+      - name: Upload Linux .deb & Standalone Binary Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: foil-linux-amd64-packages
+          path: |
+            core/target/debian/*.deb
+            core/target/linux-bin/foil-linux-x86_64
+            core/target/linux-bin/foil-linux-x86_64.tar.gz
 
   test-macos:
     name: Test & Lint (macOS)
@@ -155,87 +187,6 @@ jobs:
           cargo clippy --workspace --all-targets -- -D warnings
           cargo test --workspace
 
-  package-linux:
-    name: Package Linux (.deb & standalone binary)
-    needs: [test-linux]
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          path: core
-
-      - name: Ensure templates/default exists
-        run: |
-          mkdir -p templates/default/src/slides templates/default/src/styles
-          echo '{"title":"Foil Presentation","aspectRatio":"16:9","width":1920,"height":1080,"theme":"default","slides":[]}' > templates/default/manifest.json
-          echo '{"name":"foil-deck","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite","build":"vite build"}}' > templates/default/package.json
-          echo 'import { defineConfig } from "vite"; export default defineConfig({ base: "./" });' > templates/default/vite.config.ts
-          echo '<!doctype html><html><head><meta charset="utf-8"><title>Foil</title></head><body><div id="foil-root"></div></body></html>' > templates/default/index.html
-          echo ':root { --foil-bg: #0b0f19; }' > templates/default/src/styles/theme.css
-          echo 'export default { html: "<section class=\"slide\"><h1>Foil</h1></section>" };' > templates/default/src/slides/01-capa.js
-          echo 'export default { html: "<section class=\"slide\"><h2>Demo</h2></section>" };' > templates/default/src/slides/02-demo.js
-
-      - name: Cache APT packages (.deb)
-        uses: actions/cache@v4
-        with:
-          path: /tmp/apt-cache
-          key: apt-webkit2gtk-ubuntu24.04-v1
-
-      - name: Install Linux dependencies
-        run: |
-          mkdir -p /tmp/apt-cache
-          sudo apt-get update
-          sudo apt-get install -y -o Dir::Cache::Archives="/tmp/apt-cache" \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            dpkg-dev \
-            pkg-config \
-            build-essential
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo Registry, Git & Target Build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: core
-          cache-on-failure: true
-          shared-key: "linux-release-cargo"
-
-      - name: Cache cargo-deb binary
-        id: cache-cargo-deb
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/cargo-deb
-          key: cargo-deb-2.10-${{ runner.os }}
-
-      - name: Install cargo-deb
-        if: steps.cache-cargo-deb.outputs.cache-hit != 'true'
-        run: cargo install cargo-deb --locked
-
-      - name: Build Release Binary, Strip, Tarball & Generate .deb
-        working-directory: core
-        run: |
-          cargo build --release -p foil-cli
-          strip target/release/foil
-          mkdir -p target/linux-bin
-          cp target/release/foil target/linux-bin/foil-linux-x86_64
-          chmod +x target/linux-bin/foil-linux-x86_64
-          tar -C target/release -czf target/linux-bin/foil-linux-x86_64.tar.gz foil
-          cargo deb -p foil-cli --no-build
-
-      - name: Upload Linux .deb & Standalone Binary Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: foil-linux-amd64-packages
-          path: |
-            core/target/debian/*.deb
-            core/target/linux-bin/foil-linux-x86_64
-            core/target/linux-bin/foil-linux-x86_64.tar.gz
-
   package-dmg:
     name: Package macOS (.dmg & Foil.app)
     needs: [test-macos]
@@ -304,9 +255,9 @@ jobs:
             <key>CFBundleDisplayName</key>
             <string>Foil Player</string>
             <key>CFBundleVersion</key>
-            <string>0.1.4</string>
+            <string>0.1.5</string>
             <key>CFBundleShortVersionString</key>
-            <string>0.1.4</string>
+            <string>0.1.5</string>
             <key>CFBundlePackageType</key>
             <string>APPL</string>
             <key>NSHighResolutionCapable</key>
@@ -401,7 +352,7 @@ jobs:
   publish-github-release:
     name: Publish GitHub Release Assets
     if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
-    needs: [package-linux, package-dmg, package-msi]
+    needs: [linux, package-dmg, package-msi]
     runs-on: ubuntu-latest
     steps:
       - name: Download all installer artifacts
