@@ -220,8 +220,29 @@ jobs:
           cache-on-failure: true
           shared-key: "macos-release-cargo"
 
+      - name: Import Apple Signing Certificate
+        env:
+          APPLE_CERT_BASE64: ${{ secrets.APPLE_CERT_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASS=$(openssl rand -hex 16)
+          echo "$APPLE_CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN_PATH" -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
       - name: Build Universal macOS Binary & Create Foil.app + .dmg
         working-directory: core
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           cargo build --release -p foil-cli --target aarch64-apple-darwin
           cargo build --release -p foil-cli --target x86_64-apple-darwin
@@ -279,6 +300,11 @@ jobs:
           </plist>
           PLIST
 
+          codesign --force --options runtime --timestamp --deep \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            target/dmg/Foil.app
+          codesign --verify --deep --strict --verbose=2 target/dmg/Foil.app
+
           ln -s /Applications target/dmg/Applications
           mkdir -p target/macos-dmg
           hdiutil create \
@@ -287,6 +313,19 @@ jobs:
             -ov \
             -format UDZO \
             target/macos-dmg/foil-macos-universal.dmg
+
+          codesign --force --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            target/macos-dmg/foil-macos-universal.dmg
+
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM_ID" ] && [ -n "$APPLE_APP_PASSWORD" ]; then
+            xcrun notarytool submit target/macos-dmg/foil-macos-universal.dmg \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" \
+              --wait
+            xcrun stapler staple target/macos-dmg/foil-macos-universal.dmg
+          fi
 
       - name: Upload .dmg Artifact
         uses: actions/upload-artifact@v4
