@@ -27,6 +27,7 @@ assets = [
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
+gpui-kit = "0.10"
 foil-mcp-server = { path = "../mcp-server" }
 foil-packager = { path = "../packager" }
 foil-player = { path = "../player" }

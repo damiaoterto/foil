@@ -9,8 +9,10 @@ use std::process::{Child, Command};
 #[derive(Parser, Debug)]
 #[command(name = "foil", version, about = "AI-First Presentation Engine")]
 pub struct FoilCli {
+    #[arg(value_name = "FILE")]
+    pub file: Option<PathBuf>,
     #[command(subcommand)]
-    pub command: FoilCommand,
+    pub command: Option<FoilCommand>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -83,8 +85,8 @@ impl From<CliBuildTarget> for BuildTarget {
     }
 }
 
-pub fn execute_cli(cli: FoilCli, cwd: &Path) -> Result<(), CliError> {
-    match cli.command {
+pub fn execute_cli(command: FoilCommand, cwd: &Path) -> Result<(), CliError> {
+    match command {
         FoilCommand::Create {
             name,
             template,
