@@ -3,8 +3,10 @@ use clap::{Parser, Subcommand, ValueEnum};
 use foil_mcp_server::run_mcp_stdio_server;
 use foil_packager::{build_deck, BuildReport, BuildTarget, FoilArchiveReader};
 use foil_player::{run_player, PlayerConfig, PlayerMode, DEFAULT_DEV_BRIDGE_PORT};
+use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
+use std::time::{Duration, Instant};
 
 #[derive(Parser, Debug)]
 #[command(name = "foil", version, about = "AI-First Presentation Engine")]
@@ -184,5 +186,16 @@ fn spawn_vite_dev_server(cwd: &Path, port: u16, open_browser: bool) -> Result<Ch
     if open_browser {
         cmd.arg("--open");
     }
-    Ok(cmd.spawn()?)
+    let child = cmd.spawn()?;
+    if !open_browser {
+        let addr = SocketAddr::from(([127, 0, 0, 1], port));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < deadline {
+            if TcpStream::connect_timeout(&addr, Duration::from_millis(50)).is_ok() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+    Ok(child)
 }

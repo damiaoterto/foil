@@ -149,4 +149,18 @@ mod tests {
         let dest_again = install_cli_to_dir(&fake_exe, &bin_dir).expect("reinstall cli");
         assert_eq!(dest, dest_again);
     }
+
+    #[test]
+    fn test_install_skill_to_dir_writes_skill_and_references() {
+        use super::gui::install_skill_to_dir;
+
+        let dir = tempdir().expect("tempdir");
+        let skills_root = dir.path().join(".agents").join("skills");
+        let dest = install_skill_to_dir(&skills_root).expect("install skill");
+
+        assert!(dest.join("SKILL.md").is_file());
+        assert!(dest.join("references/design-and-typography.md").is_file());
+        assert!(dest.join("references/motion-and-3d.md").is_file());
+        assert!(dest.join("references/charts-and-diagrams.md").is_file());
+    }
 }
